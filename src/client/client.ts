@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import * as ZapparThree from '@zappar/zappar-threejs'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+import TWEEN from '@tweenjs/tween.js'
 
 if (ZapparThree.browserIncompatible()) {
     // The browserIncompatibleUI() function shows a full-page dialog that informs the user
@@ -62,6 +62,7 @@ gltfLoader.load(
         gltf.scene.position.set(0, -0.7, 1)
         gltf.scene.rotation.set(Math.PI / 2, 0, 0)
         console.log(gltf.scene)
+        gltf.scene.name = 'glove'
         // Add the scene to the tracker group
         gltf.scene.traverse(function (child) {
             if ((child as THREE.Mesh).isMesh) {
@@ -90,16 +91,73 @@ faceTrackerGroup.faceTracker.onNotVisible.bind(() => {
     faceTrackerGroup.visible = false
 })
 
-const geometry = new THREE.BoxGeometry()
-const material = new THREE.MeshBasicMaterial({
-    color: 0x00ff00,
-    wireframe: true,
-})
+// Create a cricket ball
+const cricketBallGeometry = new THREE.SphereGeometry(0.2, 32, 32)
+const cricketBallTextureLoader = new THREE.TextureLoader()
+const cricketBallTexture = cricketBallTextureLoader.load('images/ball.png') // Adjust the path to your texture
+const cricketBallMaterial = new THREE.MeshBasicMaterial({ map: cricketBallTexture })
+const cricketBall = new THREE.Mesh(cricketBallGeometry, cricketBallMaterial)
+const glove = faceTrackerGroup.getObjectByName('name')
+// Set the initial position of the cricket ball
+if (glove) {
+    console.log('in glove')
+    cricketBall.position.set(glove.position.x, glove.position.y, glove.position.z)
+} else {
+    cricketBall.position.set(-0.7657464742660522, 0.06717102974653244, -3.1538567543029785)
+}
 
-const cube = new THREE.Mesh(geometry, material)
-faceTrackerGroup.add(cube)
+// Adjust the initial position as needed
+scene.add(cricketBall)
+
+// Create 6 ball icons
+const ballGeometry = new THREE.SphereGeometry(0.1, 32, 32)
+const ballMaterial = new THREE.MeshBasicMaterial({ map: cricketBallTexture })
+
+for (let i = 0; i < 6; i++) {
+    const ball = new THREE.Mesh(ballGeometry, ballMaterial)
+    ball.position.set(-0.7657464742660522 + 0.3 * i, 0.66717102974653244, -3.1538567543029785)
+    scene.add(ball)
+}
+
+// Function to animate the cricket ball
+function throwCricketBall() {
+    console.log('ball is thrown')
+    const initialPosition = {
+        x: -0.7657464742660522,
+        y: 0.06717102974653244,
+        z: -3.1538567543029785,
+    } // Initial position
+    const targetPosition = { x: 0, y: -2, z: 0 } // Target position
+
+    const throwDuration = 2000 // Animation duration in milliseconds
+
+    const cricketBallAnimation = new TWEEN.Tween(initialPosition)
+        .to(targetPosition, throwDuration)
+        .easing(TWEEN.Easing.Quadratic.Out) // Adjust the easing function as needed
+        .onUpdate(() => {
+            cricketBall.position.set(initialPosition.x, initialPosition.y, initialPosition.z)
+        })
+        .onComplete(() => {
+            // Animation complete, you can add further actions here
+            console.log('ball thrown')
+        })
+
+    cricketBallAnimation.start()
+}
+
+// Call the throwCricketBall function to start the animation
+
+const throwButton = document.getElementById('throwButton')
+
+// Add an event listener to the button
+if (throwButton)
+    throwButton.addEventListener('click', () => {
+        // Call the throwCricketBall function when the button is clicked
+        throwCricketBall()
+    })
 
 window.addEventListener('resize', onWindowResize, false)
+console.log('scene', scene)
 function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight)
     render()
@@ -107,12 +165,16 @@ function onWindowResize() {
 
 function animate() {
     requestAnimationFrame(animate)
-
-    cube.rotation.x += 0.01
-    cube.rotation.y += 0.01
+    // Rotate the balls (for example)
+    scene.children.forEach((child) => {
+        if (child instanceof THREE.Mesh) {
+            child.rotation.x += 0.01
+            child.rotation.y += 0.01
+        }
+    })
     camera.updateFrame(renderer)
     mask.updateFromFaceAnchorGroup(faceTrackerGroup)
-
+    TWEEN.update()
     render()
 }
 
