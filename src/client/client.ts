@@ -91,70 +91,102 @@ faceTrackerGroup.faceTracker.onNotVisible.bind(() => {
     faceTrackerGroup.visible = false
 })
 
-// Create a cricket ball
-const cricketBallGeometry = new THREE.SphereGeometry(0.2, 32, 32)
-const cricketBallTextureLoader = new THREE.TextureLoader()
-const cricketBallTexture = cricketBallTextureLoader.load('images/ball.png') // Adjust the path to your texture
-const cricketBallMaterial = new THREE.MeshBasicMaterial({ map: cricketBallTexture })
-const cricketBall = new THREE.Mesh(cricketBallGeometry, cricketBallMaterial)
-const glove = faceTrackerGroup.getObjectByName('name')
-// Set the initial position of the cricket ball
-if (glove) {
-    console.log('in glove')
-    cricketBall.position.set(glove.position.x, glove.position.y, glove.position.z)
-} else {
-    cricketBall.position.set(-0.7657464742660522, 0.06717102974653244, -3.1538567543029785)
-}
+// Create a cricket balls
 
-// Adjust the initial position as needed
-scene.add(cricketBall)
+const cricketBallTextureLoader = new THREE.TextureLoader()
+const cricketBallTexture1 = cricketBallTextureLoader.load('images/ball.png')
+const cricketBallTexture2 = cricketBallTextureLoader.load('images/ball2.png')
+const cricketBallTexture3 = cricketBallTextureLoader.load('images/ball3.png')
+const cricketBallTexture4 = cricketBallTextureLoader.load('images/ball4.png') // Adjust the path to your texture
+
+const cricketBallTextures = [
+    cricketBallTexture1,
+    cricketBallTexture2,
+    cricketBallTexture3,
+    cricketBallTexture4,
+]
 
 // Create 6 ball icons
 const ballGeometry = new THREE.SphereGeometry(0.1, 32, 32)
-const ballMaterial = new THREE.MeshBasicMaterial({ map: cricketBallTexture })
+const ballMaterials = cricketBallTextures.map(
+    (texture) => new THREE.MeshBasicMaterial({ map: texture })
+)
+
+const balls: THREE.Object3D<THREE.Event>[] = [] // Array to store the ball objects
 
 for (let i = 0; i < 6; i++) {
-    const ball = new THREE.Mesh(ballGeometry, ballMaterial)
+    const ball = new THREE.Mesh(ballGeometry, ballMaterials[i % ballMaterials.length])
     ball.position.set(-0.7657464742660522 + 0.3 * i, 0.66717102974653244, -3.1538567543029785)
     scene.add(ball)
+
+    ball.userData.index = i // Store the index for later reference
+    ball.addEventListener('click', () => {
+        console.log('started click')
+        throwCricketBall(ball)
+    })
+    balls.push(ball)
 }
+
+console.log(balls)
 
 // Function to animate the cricket ball
-function throwCricketBall() {
+function throwCricketBall(ball: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>) {
     console.log('ball is thrown')
     const initialPosition = {
-        x: -0.7657464742660522,
-        y: 0.06717102974653244,
-        z: -3.1538567543029785,
+        x: ball.position.x,
+        y: ball.position.y,
+        z: ball.position.z,
     } // Initial position
-    const targetPosition = { x: 0, y: -2, z: 0 } // Target position
+    const screenHeight = window.innerHeight
 
+    const maxY = -screenHeight / 2 + ball.geometry.parameters.radius
+    const targetPosition = { x: ball.position.x, y: -2, z: ball.position.z } // Target position
     const throwDuration = 2000 // Animation duration in milliseconds
+    const bounceHeight = 1
 
-    const cricketBallAnimation = new TWEEN.Tween(initialPosition)
+    new TWEEN.Tween(initialPosition)
         .to(targetPosition, throwDuration)
-        .easing(TWEEN.Easing.Quadratic.Out) // Adjust the easing function as needed
+        .easing(TWEEN.Easing.Quadratic.Out)
         .onUpdate(() => {
-            cricketBall.position.set(initialPosition.x, initialPosition.y, initialPosition.z)
+            ball.position.set(initialPosition.x, initialPosition.y, initialPosition.z)
         })
-        .onComplete(() => {
+        .start()
+        .onComplete((e) => {
             // Animation complete, you can add further actions here
-            console.log('ball thrown')
+            console.log('ball thrown', e)
+            const bounceAnimation = new TWEEN.Tween(ball.position)
+                .to({ x: e.x, y: bounceHeight, z: e.z }, throwDuration / 2)
+                .easing(TWEEN.Easing.Bounce.Out)
+                .onComplete(() => {
+                    console.log('bounce')
+                })
+            bounceAnimation.start()
         })
-
-    cricketBallAnimation.start()
 }
 
-// Call the throwCricketBall function to start the animation
+const raycaster = new THREE.Raycaster()
+const mouse = new THREE.Vector2()
 
-const throwButton = document.getElementById('throwButton')
+// Add a click event listener to the renderer
+renderer.domElement.addEventListener('click', onDocumentClick, false)
 
-// Add an event listener to the button
-if (throwButton)
-    throwButton.addEventListener('click', () => {
-        // Call the throwCricketBall function when the button is clicked
-        throwCricketBall()
-    })
+function onDocumentClick(event: MouseEvent) {
+    // Calculate the mouse coordinates (0 to 1) in the canvas
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
+
+    // Update the raycaster with the mouse position
+    raycaster.setFromCamera(mouse, camera)
+
+    // Calculate intersections
+    const intersects = raycaster.intersectObjects(balls)
+
+    // Check if any balls were clicked
+    if (intersects.length > 0) {
+        const clickedBall: any = intersects[0].object
+        throwCricketBall(clickedBall)
+    }
+}
 
 window.addEventListener('resize', onWindowResize, false)
 console.log('scene', scene)
