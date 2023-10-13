@@ -16,6 +16,7 @@ if (ZapparThree.browserIncompatible()) {
 
 let updateBoundingBoxes: () => void
 let checkCollisions: () => void
+let throwCricketBall: (obj: any) => void
 
 const scene = new THREE.Scene()
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
@@ -91,6 +92,7 @@ const balls: THREE.Object3D<THREE.Event>[] = [] // Array to store the ball objec
 for (let i = 0; i < 6; i++) {
     const ball = new THREE.Mesh(ballGeometry, ballMaterials[i % ballMaterials.length])
     ball.position.set(-0.7657464742660522 + 0.3 * i, 0.66717102974653244, -3.1538567543029785)
+    ball.frustumCulled = false
     scene.add(ball)
 
     ball.userData.index = i // Store the index for later reference
@@ -102,65 +104,6 @@ for (let i = 0; i < 6; i++) {
 }
 
 console.log(balls)
-
-// Function to animate the cricket ball
-function throwCricketBall(ball: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>) {
-    console.log('ball is thrown')
-    const initialPosition = {
-        x: ball.position.x,
-        y: ball.position.y,
-        z: ball.position.z,
-    } // Initial position
-    const screenHeight = window.innerHeight
-
-    const maxY = -screenHeight / 2 + ball.geometry.parameters.radius
-    const targetPosition = { x: ball.position.x, y: -2, z: ball.position.z } // Target position
-    const throwDuration = 2000 // Animation duration in milliseconds
-    const bounceHeight = 1
-
-    new TWEEN.Tween(initialPosition)
-        .to(targetPosition, throwDuration)
-        .easing(TWEEN.Easing.Quadratic.Out)
-        .onUpdate(() => {
-            ball.position.set(initialPosition.x, initialPosition.y, initialPosition.z)
-        })
-        .start()
-        .onComplete((e) => {
-            // Animation complete, you can add further actions here
-            console.log('ball thrown', e)
-            const bounceAnimation = new TWEEN.Tween(ball.position)
-                .to({ x: e.x, y: bounceHeight, z: e.z }, throwDuration / 2)
-                .easing(TWEEN.Easing.Bounce.Out)
-                .onComplete(() => {
-                    console.log('bounce')
-                })
-            bounceAnimation.start()
-        })
-}
-
-const raycaster = new THREE.Raycaster()
-const mouse = new THREE.Vector2()
-
-// Add a click event listener to the renderer
-renderer.domElement.addEventListener('click', onDocumentClick, false)
-
-function onDocumentClick(event: MouseEvent) {
-    // Calculate the mouse coordinates (0 to 1) in the canvas
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
-
-    // Update the raycaster with the mouse position
-    raycaster.setFromCamera(mouse, camera)
-
-    // Calculate intersections
-    const intersects = raycaster.intersectObjects(balls)
-
-    // Check if any balls were clicked
-    if (intersects.length > 0) {
-        const clickedBall: any = intersects[0].object
-        throwCricketBall(clickedBall)
-    }
-}
 
 // creating bounding boxes to check for collison
 
@@ -188,7 +131,35 @@ const gloveModel = gltfLoader.load(
         const gloveBoundingBox = new THREE.Box3()
         //@ts-ignore
         const gloveBoundingBoxHelper = new THREE.Box3Helper(gloveBoundingBox, 0xffff00)
+        gloveBoundingBoxHelper.position.set(
+            gltf.scene.position.x,
+            gltf.scene.position.y,
+            gltf.scene.position.z
+        )
         faceTrackerGroup.add(gloveBoundingBoxHelper)
+
+        // Create a wireframe material for the bounding box
+        const gloveBoundingBoxMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 })
+
+        // Create a wireframe box geometry for the bounding box
+        const gloveBoundingBoxGeometry = new THREE.BoxGeometry()
+        gloveBoundingBox.applyMatrix4(gltf.scene.matrixWorld) // Apply the world matrix to the bounding box
+
+        // Create a mesh with the wireframe material and geometry
+        const gloveBoundingBoxMesh = new THREE.LineSegments(
+            gloveBoundingBoxGeometry,
+            gloveBoundingBoxMaterial
+        )
+
+        // Add the gloveBoundingBoxMesh as a child of the GLTF model
+        gltf.scene.add(gloveBoundingBoxMesh)
+
+        // Adjust the position and scale of the bounding box mesh if needed
+        gloveBoundingBoxMesh.position.set(0, 0, 0) // Set the position
+        gloveBoundingBoxMesh.scale.set(1, 1, 1) // Set the scale
+
+        // Make the bounding box visible
+        gloveBoundingBoxMesh.visible = true
 
         // Update bounding boxes in the animation loop
         updateBoundingBoxes = function () {
@@ -213,6 +184,47 @@ const gloveModel = gltfLoader.load(
                 }
             })
         }
+
+        // Function to animate the cricket ball
+        throwCricketBall = function (
+            ball: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>
+        ) {
+            console.log('ball is thrown')
+            const initialPosition = {
+                x: ball.position.x,
+                y: ball.position.y,
+                z: ball.position.z,
+            } // Initial position
+            const screenHeight = window.innerHeight
+
+            const maxY = -screenHeight / 2 + ball.geometry.parameters.radius
+            const targetPosition = {
+                x: gltf.scene.position.x,
+                y: gltf.scene.position.y - 1,
+                z: ball.position.z,
+            } // Target position
+            const throwDuration = 2000 // Animation duration in milliseconds
+            const bounceHeight = 1
+
+            new TWEEN.Tween(initialPosition)
+                .to(targetPosition, throwDuration)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .onUpdate(() => {
+                    ball.position.set(initialPosition.x, initialPosition.y, initialPosition.z)
+                })
+                .start()
+                .onComplete((e) => {
+                    // Animation complete, you can add further actions here
+                    console.log('ball thrown', e)
+                    const bounceAnimation = new TWEEN.Tween(ball.position)
+                        .to({ x: e.x, y: bounceHeight, z: e.z }, throwDuration / 2)
+                        .easing(TWEEN.Easing.Bounce.Out)
+                        .onComplete(() => {
+                            console.log('bounce')
+                        })
+                    bounceAnimation.start()
+                })
+        }
         faceTrackerGroup.add(gltf.scene)
     },
     undefined,
@@ -224,6 +236,30 @@ const gloveModel = gltfLoader.load(
 // And then a little ambient light to brighten the model up a bit
 const ambientLight = new THREE.AmbientLight('white', 0.4)
 scene.add(ambientLight)
+
+const raycaster = new THREE.Raycaster()
+const mouse = new THREE.Vector2()
+
+// Add a click event listener to the renderer
+renderer.domElement.addEventListener('click', onDocumentClick, false)
+
+function onDocumentClick(event: MouseEvent) {
+    // Calculate the mouse coordinates (0 to 1) in the canvas
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
+
+    // Update the raycaster with the mouse position
+    raycaster.setFromCamera(mouse, camera)
+
+    // Calculate intersections
+    const intersects = raycaster.intersectObjects(balls)
+
+    // Check if any balls were clicked
+    if (intersects.length > 0) {
+        const clickedBall: any = intersects[0].object
+        if (throwCricketBall) throwCricketBall(clickedBall)
+    }
+}
 
 window.addEventListener('resize', onWindowResize, false)
 console.log('scene', scene)
