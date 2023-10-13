@@ -88,12 +88,19 @@ const ballMaterials = cricketBallTextures.map(
 )
 
 const balls: THREE.Object3D<THREE.Event>[] = [] // Array to store the ball objects
+const ballBoundingBoxes: THREE.Box3[] = []
 
 for (let i = 0; i < 6; i++) {
     const ball = new THREE.Mesh(ballGeometry, ballMaterials[i % ballMaterials.length])
     ball.position.set(-0.7657464742660522 + 0.3 * i, 0.66717102974653244, -3.1538567543029785)
     ball.frustumCulled = false
     scene.add(ball)
+
+    const ballBoundingBox = new THREE.Box3()
+    ballBoundingBox.setFromObject(ball)
+    ballBoundingBox.expandByScalar(0.05) // Expand the bounding box a bit for accuracy
+
+    ballBoundingBoxes.push(ballBoundingBox)
 
     ball.userData.index = i // Store the index for later reference
     ball.addEventListener('click', () => {
@@ -108,8 +115,6 @@ console.log(balls)
 // creating bounding boxes to check for collison
 
 // Create bounding boxes for the GLB model and balls
-
-const ballBoundingBoxes: THREE.Box3[] = []
 
 const gltfLoader = new GLTFLoader(manager)
 const gloveModel = gltfLoader.load(
@@ -129,37 +134,38 @@ const gloveModel = gltfLoader.load(
             }
         })
         const gloveBoundingBox = new THREE.Box3()
+        //-----------CODE FOR DEBUGGING HELP ------------
         //@ts-ignore
-        const gloveBoundingBoxHelper = new THREE.Box3Helper(gloveBoundingBox, 0xffff00)
-        gloveBoundingBoxHelper.position.set(
-            gltf.scene.position.x,
-            gltf.scene.position.y,
-            gltf.scene.position.z
-        )
-        faceTrackerGroup.add(gloveBoundingBoxHelper)
+        // const gloveBoundingBoxHelper = new THREE.Box3Helper(gloveBoundingBox, 0xffff00)
+        // gloveBoundingBoxHelper.position.set(
+        //     gltf.scene.position.x,
+        //     gltf.scene.position.y,
+        //     gltf.scene.position.z
+        // )
+        // faceTrackerGroup.add(gloveBoundingBoxHelper)
 
-        // Create a wireframe material for the bounding box
-        const gloveBoundingBoxMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 })
+        // // Create a wireframe material for the bounding box
+        // const gloveBoundingBoxMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 })
 
-        // Create a wireframe box geometry for the bounding box
-        const gloveBoundingBoxGeometry = new THREE.BoxGeometry()
-        gloveBoundingBox.applyMatrix4(gltf.scene.matrixWorld) // Apply the world matrix to the bounding box
+        // // Create a wireframe box geometry for the bounding box
+        // const gloveBoundingBoxGeometry = new THREE.BoxGeometry()
+        // gloveBoundingBox.applyMatrix4(gltf.scene.matrixWorld) // Apply the world matrix to the bounding box
 
-        // Create a mesh with the wireframe material and geometry
-        const gloveBoundingBoxMesh = new THREE.LineSegments(
-            gloveBoundingBoxGeometry,
-            gloveBoundingBoxMaterial
-        )
+        // // Create a mesh with the wireframe material and geometry
+        // const gloveBoundingBoxMesh = new THREE.LineSegments(
+        //     gloveBoundingBoxGeometry,
+        //     gloveBoundingBoxMaterial
+        // )
 
-        // Add the gloveBoundingBoxMesh as a child of the GLTF model
-        gltf.scene.add(gloveBoundingBoxMesh)
+        // // Add the gloveBoundingBoxMesh as a child of the GLTF model
+        // gltf.scene.add(gloveBoundingBoxMesh)
 
-        // Adjust the position and scale of the bounding box mesh if needed
-        gloveBoundingBoxMesh.position.set(0, 0, 0) // Set the position
-        gloveBoundingBoxMesh.scale.set(1, 1, 1) // Set the scale
+        // // Adjust the position and scale of the bounding box mesh if needed
+        // gloveBoundingBoxMesh.position.set(0, 0, 0) // Set the position
+        // gloveBoundingBoxMesh.scale.set(1, 1, 1) // Set the scale
 
-        // Make the bounding box visible
-        gloveBoundingBoxMesh.visible = true
+        // // Make the bounding box visible
+        // gloveBoundingBoxMesh.visible = true
 
         // Update bounding boxes in the animation loop
         updateBoundingBoxes = function () {
@@ -168,19 +174,32 @@ const gloveModel = gltfLoader.load(
 
             // Update ball bounding boxes
             ballBoundingBoxes.forEach((boundingBox, index) => {
-                boundingBox.setFromObject(balls[index]) // Adjust to your model
+                boundingBox.setFromObject(balls[index])
             })
         }
 
+        // Create an HTML element to display the score
+        const scoreElement = document.createElement('div')
+        scoreElement.innerText = 'Score: 0'
+        scoreElement.style.position = 'absolute'
+        scoreElement.style.color = 'white'
+        scoreElement.style.top = '10px'
+        scoreElement.style.left = '10px'
+        document.body.appendChild(scoreElement)
+        // Define a variable to keep track of the score
+
         // Collision detection
         checkCollisions = function () {
-            console.log('started to check for collisons ')
             // Check for collisions between glove and balls
             ballBoundingBoxes.forEach((ballBoundingBox, index) => {
                 if (gloveBoundingBox.intersectsBox(ballBoundingBox)) {
+                    let score = 0
                     // Collision detected between glove and the ball at index
                     // Implement collision response, e.g., bounce the ball
-                    console.log('collision detected')
+                    // Update the score
+                    score++
+                    scoreElement.innerText = 'Score: ' + score
+                    console.log('collision detected', index)
                 }
             })
         }
@@ -197,11 +216,15 @@ const gloveModel = gltfLoader.load(
             } // Initial position
             const screenHeight = window.innerHeight
 
+            const randomX = Math.random() * 0.5 - 0.25 // Random variation in x-axis
+
+            const randomZ = Math.random() * 0.5 - 0.25 // Random variation in z-axis
+
             const maxY = -screenHeight / 2 + ball.geometry.parameters.radius
             const targetPosition = {
-                x: gltf.scene.position.x,
+                x: ball.position.x + randomX,
                 y: gltf.scene.position.y - 1,
-                z: ball.position.z,
+                z: ball.position.z + randomZ,
             } // Target position
             const throwDuration = 2000 // Animation duration in milliseconds
             const bounceHeight = 1
@@ -278,8 +301,8 @@ function animate() {
         }
     })
 
-    if (updateBoundingBoxes) updateBoundingBoxes() // Update bounding boxes' positions
     if (checkCollisions) checkCollisions() // Check for collisions
+    if (updateBoundingBoxes) updateBoundingBoxes() // Update bounding boxes' positions
     camera.updateFrame(renderer)
     mask.updateFromFaceAnchorGroup(faceTrackerGroup)
     TWEEN.update()
