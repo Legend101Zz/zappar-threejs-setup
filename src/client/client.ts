@@ -14,6 +14,9 @@ if (ZapparThree.browserIncompatible()) {
     throw new Error('Unsupported browser')
 }
 
+let updateBoundingBoxes: () => void
+let checkCollisions: () => void
+
 const scene = new THREE.Scene()
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
 renderer.setSize(window.innerWidth, window.innerHeight)
@@ -53,35 +56,6 @@ faceTrackerGroup.add(mask)
 
 // Load a 3D model to place within our group (using ThreeJS's GLTF loader)
 // Pass our loading manager in to ensure the progress bar works correctly
-
-const gltfLoader = new GLTFLoader(manager)
-gltfLoader.load(
-    'models/gloves.glb',
-    (gltf) => {
-        gltf.scene.scale.set(2, 2, 2)
-        gltf.scene.position.set(0, -0.7, 1)
-        gltf.scene.rotation.set(Math.PI / 2, 0, 0)
-        console.log(gltf.scene)
-        gltf.scene.name = 'glove'
-        // Add the scene to the tracker group
-        gltf.scene.traverse(function (child) {
-            if ((child as THREE.Mesh).isMesh) {
-                let m = child as THREE.Mesh
-                //m.castShadow = true
-                m.frustumCulled = false
-            }
-        })
-        faceTrackerGroup.add(gltf.scene)
-    },
-    undefined,
-    () => {
-        console.log('An error ocurred loading the GLTF model')
-    }
-)
-
-// And then a little ambient light to brighten the model up a bit
-const ambientLight = new THREE.AmbientLight('white', 0.4)
-scene.add(ambientLight)
 
 // Hide the 3D content when the face is out of view
 faceTrackerGroup.faceTracker.onVisible.bind(() => {
@@ -188,6 +162,69 @@ function onDocumentClick(event: MouseEvent) {
     }
 }
 
+// creating bounding boxes to check for collison
+
+// Create bounding boxes for the GLB model and balls
+
+const ballBoundingBoxes: THREE.Box3[] = []
+
+const gltfLoader = new GLTFLoader(manager)
+const gloveModel = gltfLoader.load(
+    'models/gloves.glb',
+    (gltf) => {
+        gltf.scene.scale.set(2, 2, 2)
+        gltf.scene.position.set(0, -0.7, 1)
+        gltf.scene.rotation.set(Math.PI / 2, 0, 0)
+        console.log(gltf.scene)
+        gltf.scene.name = 'glove'
+        // Add the scene to the tracker group
+        gltf.scene.traverse(function (child) {
+            if ((child as THREE.Mesh).isMesh) {
+                let m = child as THREE.Mesh
+                //m.castShadow = true
+                m.frustumCulled = false
+            }
+        })
+        const gloveBoundingBox = new THREE.Box3()
+        //@ts-ignore
+        const gloveBoundingBoxHelper = new THREE.Box3Helper(gloveBoundingBox, 0xffff00)
+        faceTrackerGroup.add(gloveBoundingBoxHelper)
+
+        // Update bounding boxes in the animation loop
+        updateBoundingBoxes = function () {
+            // Update glove bounding box
+            gloveBoundingBox.setFromObject(gltf.scene)
+
+            // Update ball bounding boxes
+            ballBoundingBoxes.forEach((boundingBox, index) => {
+                boundingBox.setFromObject(balls[index]) // Adjust to your model
+            })
+        }
+
+        // Collision detection
+        checkCollisions = function () {
+            console.log('started to check for collisons ')
+            // Check for collisions between glove and balls
+            ballBoundingBoxes.forEach((ballBoundingBox, index) => {
+                if (gloveBoundingBox.intersectsBox(ballBoundingBox)) {
+                    // Collision detected between glove and the ball at index
+                    // Implement collision response, e.g., bounce the ball
+                    console.log('collision detected')
+                }
+            })
+        }
+        faceTrackerGroup.add(gltf.scene)
+    },
+    undefined,
+    () => {
+        console.log('An error ocurred loading the GLTF model')
+    }
+)
+
+// And then a little ambient light to brighten the model up a bit
+const ambientLight = new THREE.AmbientLight('white', 0.4)
+scene.add(ambientLight)
+
 window.addEventListener('resize', onWindowResize, false)
 console.log('scene', scene)
 function onWindowResize() {
@@ -204,6 +241,9 @@ function animate() {
             child.rotation.y += 0.01
         }
     })
+
+    if (updateBoundingBoxes) updateBoundingBoxes() // Update bounding boxes' positions
+    if (checkCollisions) checkCollisions() // Check for collisions
     camera.updateFrame(renderer)
     mask.updateFromFaceAnchorGroup(faceTrackerGroup)
     TWEEN.update()
