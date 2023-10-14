@@ -2,6 +2,9 @@ import * as THREE from 'three'
 import * as ZapparThree from '@zappar/zappar-threejs'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import TWEEN from '@tweenjs/tween.js'
+import * as CANNON from 'cannon-es'
+import CannonUtils from './utils/cannonUtils'
+import CannonDebugRenderer from './utils/cannonDebugRenderer'
 
 if (ZapparThree.browserIncompatible()) {
     // The browserIncompatibleUI() function shows a full-page dialog that informs the user
@@ -19,6 +22,8 @@ let checkCollisions: () => void
 let throwCricketBall: (obj: any) => void
 
 const scene = new THREE.Scene()
+const world = new CANNON.World()
+world.gravity.set(0, -9.82, 0)
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
