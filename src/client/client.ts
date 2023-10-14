@@ -3,7 +3,7 @@ import * as ZapparThree from '@zappar/zappar-threejs'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import TWEEN from '@tweenjs/tween.js'
 import * as CANNON from 'cannon-es'
-import CannonUtils from './utils/cannonUtils'
+import CannonUtils from './utils/canonUtils'
 import CannonDebugRenderer from './utils/cannonDebugRenderer'
 
 if (ZapparThree.browserIncompatible()) {
@@ -133,11 +133,28 @@ const gloveModel = gltfLoader.load(
         // Add the scene to the tracker group
         gltf.scene.traverse(function (child) {
             if ((child as THREE.Mesh).isMesh) {
+                // Create a Cannon.js shape from the glove geometry
+                const gloveShape = CannonUtils.CreateTrimesh((child as THREE.Mesh).geometry)
+
+                const gloveBody = new CANNON.Body({ mass: 0 })
+                gloveBody.addShape(gloveShape)
+
+                gloveBody.position.set(
+                    gltf.scene.position.x,
+                    gltf.scene.position.y,
+                    gltf.scene.position.z
+                )
+                gloveBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2)
+
+                // Add the glove body to the Cannon.js world
+                world.addBody(gloveBody)
+
                 let m = child as THREE.Mesh
                 //m.castShadow = true
                 m.frustumCulled = false
             }
         })
+
         const gloveBoundingBox = new THREE.Box3()
         //-----------CODE FOR DEBUGGING HELP ------------
         //@ts-ignore
@@ -289,6 +306,10 @@ function onDocumentClick(event: MouseEvent) {
     }
 }
 
+const clock = new THREE.Clock()
+let delta
+const cannonDebugRenderer = new CannonDebugRenderer(scene, world)
+
 window.addEventListener('resize', onWindowResize, false)
 console.log('scene', scene)
 function onWindowResize() {
@@ -305,6 +326,10 @@ function animate() {
             child.rotation.y += 0.01
         }
     })
+
+    delta = Math.min(clock.getDelta(), 0.1)
+    world.step(delta)
+    cannonDebugRenderer.update()
 
     if (checkCollisions) checkCollisions() // Check for collisions
     if (updateBoundingBoxes) updateBoundingBoxes() // Update bounding boxes' positions
