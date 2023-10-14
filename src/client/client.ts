@@ -120,23 +120,27 @@ console.log(balls)
 // creating bounding boxes to check for collison
 
 // Create bounding boxes for the GLB model and balls
-
+let gloveMesh: THREE.Object3D
+let gloveBody: CANNON.Body
+let gloveLoaded = false
 const gltfLoader = new GLTFLoader(manager)
-const gloveModel = gltfLoader.load(
+gltfLoader.load(
     'models/gloves.glb',
     (gltf) => {
         gltf.scene.scale.set(2, 2, 2)
         gltf.scene.position.set(0, -0.7, 1)
         gltf.scene.rotation.set(Math.PI / 2, 0, 0)
-        console.log(gltf.scene)
+        console.log('model_here', gltf.scene)
         gltf.scene.name = 'glove'
+        gloveMesh = gltf.scene.children[0]
         // Add the scene to the tracker group
         gltf.scene.traverse(function (child) {
             if ((child as THREE.Mesh).isMesh) {
+                let m = child as THREE.Mesh
                 // Create a Cannon.js shape from the glove geometry
-                const gloveShape = CannonUtils.CreateTrimesh((child as THREE.Mesh).geometry)
+                const gloveShape = CannonUtils.CreateTrimesh((m as THREE.Mesh).geometry)
 
-                const gloveBody = new CANNON.Body({ mass: 0 })
+                gloveBody = new CANNON.Body({ mass: 0 })
                 gloveBody.addShape(gloveShape)
 
                 gloveBody.position.set(
@@ -149,7 +153,6 @@ const gloveModel = gltfLoader.load(
                 // Add the glove body to the Cannon.js world
                 world.addBody(gloveBody)
 
-                let m = child as THREE.Mesh
                 //m.castShadow = true
                 m.frustumCulled = false
             }
@@ -271,6 +274,7 @@ const gloveModel = gltfLoader.load(
                 })
         }
         faceTrackerGroup.add(gltf.scene)
+        gloveLoaded = true
     },
     undefined,
     () => {
@@ -333,6 +337,16 @@ function animate() {
 
     if (checkCollisions) checkCollisions() // Check for collisions
     if (updateBoundingBoxes) updateBoundingBoxes() // Update bounding boxes' positions
+
+    if (gloveLoaded) {
+        gloveMesh.position.set(gloveBody.position.x, gloveBody.position.y, gloveBody.position.z)
+        gloveMesh.quaternion.set(
+            gloveBody.quaternion.x,
+            gloveBody.quaternion.y,
+            gloveBody.quaternion.z,
+            gloveBody.quaternion.w
+        )
+    }
     camera.updateFrame(renderer)
     mask.updateFromFaceAnchorGroup(faceTrackerGroup)
     TWEEN.update()
