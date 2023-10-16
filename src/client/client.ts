@@ -155,23 +155,40 @@ const gloveModel = gltfLoader.load(
         scoreElement.style.left = '10px'
         document.body.appendChild(scoreElement)
         // Define a variable to keep track of the score
+        let score = 0
+        let scoreDisplayTimeout = null
+
+        function showScoreText() {
+            const center = calculateCenterOfScreen()
+            const scoreText = document.createElement('div')
+            scoreText.innerText = 'Score: ' + score
+            scoreText.style.position = 'absolute'
+            scoreText.style.color = 'red'
+            scoreText.style.fontSize = '48px'
+            scoreText.style.top = center.y - 24 + 'px' // Adjust positioning as needed
+            scoreText.style.left = center.x - 100 + 'px' // Adjust positioning as needed
+            document.body.appendChild(scoreText)
+
+            scoreDisplayTimeout = setTimeout(() => {
+                document.body.removeChild(scoreText)
+            }, 2000) // Remove the score text after 2 seconds
+        }
+
         // Collision detection
         checkCollisions = function () {
             console.log('checking for collisions')
             // Check for collisions between glove and balls
             ballBoundingBoxes.forEach((ballBoundingBox, index) => {
                 if (gloveBoundingBox.intersectsBox(ballBoundingBox)) {
-                    let score = 0
                     score++
                     scoreElement.innerText = 'Score: ' + score
                     console.log('Collision detected with ball ' + index)
 
                     const ball = balls[index]
-                    const ballPosition = new THREE.Vector3()
-                    ball.getWorldPosition(ballPosition)
-
-                    // Call the firecracker animation on collision
-                    playFirecrackerAnimation(ballPosition.x, ballPosition.y)
+                    ball.visible = false
+                    faceTrackerGroup.add(ball)
+                    // Call the score
+                    showScoreText()
                 }
             })
         }
@@ -247,29 +264,38 @@ const gloveModel = gltfLoader.load(
 
 //animation on catching the ball
 
+// Function to calculate the center of the viewport
+function calculateCenterOfScreen() {
+    const centerX = window.innerWidth / 2
+    const centerY = window.innerHeight / 2
+    return { x: centerX, y: centerY }
+}
+
 const firecrackerCanvas: any = document.getElementById('firecrackerCanvas')
 const firecrackerContext = firecrackerCanvas.getContext('2d')
 
-function playFirecrackerAnimation(x: any, y: any) {
-    // Clear the canvas
+function playFirecrackerAnimation() {
+    const center = calculateCenterOfScreen()
+
+    // Position the firecracker canvas at the center
+    firecrackerCanvas.style.position = 'absolute'
+    firecrackerCanvas.style.top = center.y - firecrackerCanvas.height / 2 + 'px'
+    firecrackerCanvas.style.left = center.x - firecrackerCanvas.width / 2 + 'px'
+
+    // Your custom animation code using firecrackerContext
+    // Example animation: draw a circle at the center
     firecrackerContext.clearRect(0, 0, firecrackerCanvas.width, firecrackerCanvas.height)
-
-    // Implement your custom firecracker animation
-    // For example, draw some shapes, use colors, and animations
-
-    // In this example, we'll draw a simple explosion
-    const colors = ['#FF5733', '#FFC300', '#0E76A8', '#1A1A1D']
-    for (let i = 0; i < 100; i++) {
-        const color = colors[Math.floor(Math.random() * colors.length)]
-        firecrackerContext.fillStyle = color
-        firecrackerContext.beginPath()
-        firecrackerContext.arc(x, y, Math.random() * 10, 0, Math.PI * 2)
-        firecrackerContext.fill()
-    }
-
-    // You can add more complex animations here
+    firecrackerContext.beginPath()
+    firecrackerContext.arc(
+        firecrackerCanvas.width / 2,
+        firecrackerCanvas.height / 2,
+        50,
+        0,
+        2 * Math.PI
+    )
+    firecrackerContext.fillStyle = 'red'
+    firecrackerContext.fill()
 }
-
 // And then a little ambient light to brighten the model up a bit
 const ambientLight = new THREE.AmbientLight('white', 0.4)
 scene.add(ambientLight)
