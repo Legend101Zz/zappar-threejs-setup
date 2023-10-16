@@ -19,19 +19,20 @@ let checkCollisions: () => void
 let throwCricketBall: (obj: any) => void
 let modelReady = false
 
-const scene = new THREE.Scene()
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
 
 const manager = new ZapparThree.LoadingManager()
 // Use this function to set your context
+let camera = new ZapparThree.Camera({
+    userCameraSource: 'RKxXByjnabbADGQNNZqLVLdmXlS0YkETYCIbg+XxnvM=',
+})
+camera.userCameraMirrorMode = ZapparThree.CameraMirrorMode.CSS
 ZapparThree.glContextSet(renderer.getContext())
-
-// Create a camera and set the scene background to the camera's backgroundTexture
-//@ts-ignore
-let camera = new ZapparThree.Camera({ facingMode: 'user' })
+const scene = new THREE.Scene()
 scene.background = camera.backgroundTexture
+// Create a camera and set the scene background to the camera's backgroundTexture
 
 // Request camera permissions and start the camera
 ZapparThree.permissionRequestUI().then((granted) => {
