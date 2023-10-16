@@ -113,12 +113,39 @@ for (let i = 0; i < 6; i++) {
 
 console.log(balls)
 
+const loadingText = document.createElement('div')
+loadingText.innerText = 'Move your head to catch the balls'
+loadingText.style.position = 'absolute'
+loadingText.style.color = 'white'
+loadingText.style.fontSize = '24px'
+loadingText.style.top = '10px'
+loadingText.style.left = '10px'
+document.body.appendChild(loadingText)
+
+// Add an arrow animation
+const arrow = document.createElement('div')
+arrow.style.width = '0'
+arrow.style.height = '0'
+arrow.style.borderLeft = '10px solid transparent'
+arrow.style.borderRight = '10px solid transparent'
+arrow.style.borderBottom = '20px solid white'
+arrow.style.position = 'absolute'
+arrow.style.top = '50px'
+arrow.style.left = '50%'
+arrow.style.transform = 'translateX(-50%)'
+document.body.appendChild(arrow)
+
 // Create bounding boxes for the GLB model and balls
 
 const gltfLoader = new GLTFLoader(manager)
 const gloveModel = gltfLoader.load(
     'models/gloves.glb',
     (gltf) => {
+        setInterval(() => {
+            document.body.removeChild(loadingText)
+            document.body.removeChild(arrow)
+        }, 2000)
+
         gltf.scene.scale.set(2, 2, 2)
         gltf.scene.position.set(0, -0.7, 1)
         gltf.scene.rotation.set(Math.PI / 2, 0, 0)
