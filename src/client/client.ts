@@ -2,9 +2,6 @@ import * as THREE from 'three'
 import * as ZapparThree from '@zappar/zappar-threejs'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import TWEEN from '@tweenjs/tween.js'
-import * as CANNON from 'cannon-es'
-import CannonUtils from './utils/canonUtils'
-import CannonDebugRenderer from './utils/cannonDebugRenderer'
 
 if (ZapparThree.browserIncompatible()) {
     // The browserIncompatibleUI() function shows a full-page dialog that informs the user
@@ -20,10 +17,9 @@ if (ZapparThree.browserIncompatible()) {
 let updateBoundingBoxes: () => void
 let checkCollisions: () => void
 let throwCricketBall: (obj: any) => void
+let modelReady = false
 
 const scene = new THREE.Scene()
-const world = new CANNON.World()
-world.gravity.set(0, -9.82, 0)
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
@@ -100,7 +96,7 @@ for (let i = 0; i < 6; i++) {
     ball.position.set(-0.7657464742660522 + 0.3 * i, 0.66717102974653244, -3.1538567543029785)
     ball.frustumCulled = false
     scene.add(ball)
-
+    // creating bounding boxes to check for collison
     const ballBoundingBox = new THREE.Box3()
     ballBoundingBox.setFromObject(ball)
     ballBoundingBox.expandByScalar(0.05) // Expand the bounding box a bit for accuracy
@@ -117,34 +113,10 @@ for (let i = 0; i < 6; i++) {
 
 console.log(balls)
 
-// Create a Cannon.js sphere shape for the balls
-const ballShape = new CANNON.Sphere(0.1) // Adjust the radius as needed
-
-// Create a Cannon.js body for each ball
-const ballBodies = balls.map((ball) => {
-    const body = new CANNON.Body({ mass: 0 })
-    body.addShape(ballShape)
-    body.position.set(ball.position.x, ball.position.y, ball.position.z)
-    world.addBody(body)
-    return body
-})
-
-// creating bounding boxes to check for collison
-
-// Create a Cannon.js plane to stop the balls from falling
-const groundShape = new CANNON.Plane()
-const groundBody = new CANNON.Body({ mass: 0 })
-groundBody.addShape(groundShape)
-groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2) // Rotate the plane to be horizontal
-groundBody.position.set(0, -1, 0) // Set the plane at the screen's end
-world.addBody(groundBody)
-
 // Create bounding boxes for the GLB model and balls
-let gloveMesh: THREE.Object3D
-let gloveBody: CANNON.Body
-let gloveLoaded = false
+
 const gltfLoader = new GLTFLoader(manager)
-gltfLoader.load(
+const gloveModel = gltfLoader.load(
     'models/gloves.glb',
     (gltf) => {
         gltf.scene.scale.set(2, 2, 2)
@@ -157,63 +129,13 @@ gltfLoader.load(
         gltf.scene.traverse(function (child) {
             if ((child as THREE.Mesh).isMesh) {
                 let m = child as THREE.Mesh
-                gloveMesh = m
-                // Create a Cannon.js shape from the glove geometry
-                const gloveShape = CannonUtils.CreateTrimesh((gloveMesh as THREE.Mesh).geometry)
-                console.log('gloveMesh', gloveMesh)
-                gloveBody = new CANNON.Body({ mass: 0 })
-                gloveBody.addShape(gloveShape)
-
-                gloveBody.position.set(
-                    gloveMesh.position.x,
-                    gloveMesh.position.y,
-                    gloveMesh.position.z
-                )
-                //gloveBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2)
-
-                // Add the glove body to the Cannon.js world
-                world.addBody(gloveBody)
 
                 //m.castShadow = true
                 m.frustumCulled = false
             }
         })
-
         const gloveBoundingBox = new THREE.Box3()
-        //-----------CODE FOR DEBUGGING HELP ------------
-        //@ts-ignore
-        // const gloveBoundingBoxHelper = new THREE.Box3Helper(gloveBoundingBox, 0xffff00)
-        // gloveBoundingBoxHelper.position.set(
-        //     gltf.scene.position.x,
-        //     gltf.scene.position.y,
-        //     gltf.scene.position.z
-        // )
-        // faceTrackerGroup.add(gloveBoundingBoxHelper)
 
-        // // Create a wireframe material for the bounding box
-        // const gloveBoundingBoxMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 })
-
-        // // Create a wireframe box geometry for the bounding box
-        // const gloveBoundingBoxGeometry = new THREE.BoxGeometry()
-        // gloveBoundingBox.applyMatrix4(gltf.scene.matrixWorld) // Apply the world matrix to the bounding box
-
-        // // Create a mesh with the wireframe material and geometry
-        // const gloveBoundingBoxMesh = new THREE.LineSegments(
-        //     gloveBoundingBoxGeometry,
-        //     gloveBoundingBoxMaterial
-        // )
-
-        // // Add the gloveBoundingBoxMesh as a child of the GLTF model
-        // gltf.scene.add(gloveBoundingBoxMesh)
-
-        // // Adjust the position and scale of the bounding box mesh if needed
-        // gloveBoundingBoxMesh.position.set(0, 0, 0) // Set the position
-        // gloveBoundingBoxMesh.scale.set(1, 1, 1) // Set the scale
-
-        // // Make the bounding box visible
-        // gloveBoundingBoxMesh.visible = true
-
-        // Update bounding boxes in the animation loop
         updateBoundingBoxes = function () {
             // Update glove bounding box
             gloveBoundingBox.setFromObject(gltf.scene)
@@ -224,7 +146,7 @@ gltfLoader.load(
             })
         }
 
-        // Create an HTML element to display the score
+        // HTML element to display the score
         const scoreElement = document.createElement('div')
         scoreElement.innerText = 'Score: 0'
         scoreElement.style.position = 'absolute'
@@ -233,92 +155,120 @@ gltfLoader.load(
         scoreElement.style.left = '10px'
         document.body.appendChild(scoreElement)
         // Define a variable to keep track of the score
-
         // Collision detection
         checkCollisions = function () {
+            console.log('checking for collisions')
             // Check for collisions between glove and balls
             ballBoundingBoxes.forEach((ballBoundingBox, index) => {
                 if (gloveBoundingBox.intersectsBox(ballBoundingBox)) {
                     let score = 0
-                    // Collision detected between glove and the ball at index
-                    // Implement collision response, e.g., bounce the ball
-                    // Update the score
-                    if (ballBodies[index].mass === 1) {
-                        // Check if the ball has a mass of 1 (meaning it has been thrown)
-                        score++
-                        scoreElement.innerText = 'Score: ' + score
-                        console.log('Collision detected with ball ' + index)
-                        ballBodies[index].mass = 0 // Reset the ball's mass to 0 so it won't fall again
-                    }
+                    score++
+                    scoreElement.innerText = 'Score: ' + score
+                    console.log('Collision detected with ball ' + index)
+
+                    const ball = balls[index]
+                    const ballPosition = new THREE.Vector3()
+                    ball.getWorldPosition(ballPosition)
+
+                    // Call the firecracker animation on collision
+                    playFirecrackerAnimation(ballPosition.x, ballPosition.y)
                 }
             })
         }
 
-        // Function to animate the cricket ball
         throwCricketBall = function (
             ball: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>
         ) {
+            console.log('started random')
+
             // Change the ball's mass to 1 when it is thrown
 
-            // console.log('ball is thrown')
-            // const initialPosition = {
-            //     x: ball.position.x,
-            //     y: ball.position.y,
-            //     z: ball.position.z,
-            // } // Initial position
-            // const screenHeight = window.innerHeight
+            console.log('ball is thrown')
+            const initialPosition = {
+                x: ball.position.x,
+                y: ball.position.y,
+                z: ball.position.z,
+            } // Initial position
+            const screenHeight = window.innerHeight
 
             const randomX = Math.random() * 0.5 - 0.25 // Random variation in x-axis
 
             const randomZ = Math.random() * 0.5 - 0.25 // Random variation in z-axis
 
-            // const maxY = -screenHeight / 2 + ball.geometry.parameters.radius
-            // const targetPosition = {
-            //     x: ball.position.x + randomX,
-            //     y: gltf.scene.position.y - 1,
-            //     z: ball.position.z + randomZ,
-            // } // Target position
-            // const throwDuration = 2000 // Animation duration in milliseconds
-            // const bounceHeight = 1
+            const maxY = -screenHeight / 2 + ball.geometry.parameters.radius
+            const targetPosition = {
+                x: ball.position.x + randomX,
+                //@ts-ignore
+                y: gltf.scene.position.y - 1,
+                z: ball.position.z + randomZ,
+            } // Target position
+            const throwDuration = 2000 // Animation duration in milliseconds
+            const bounceHeight = 1
 
-            // new TWEEN.Tween(initialPosition)
-            //     .to(targetPosition, throwDuration)
-            //     .easing(TWEEN.Easing.Quadratic.Out)
-            //     .onUpdate(() => {
-            //         ball.position.set(initialPosition.x, initialPosition.y, initialPosition.z)
-            //     })
-            //     .start()
-            //     .onComplete((e) => {
-            //         // Animation complete, you can add further actions here
-            //         console.log('ball thrown', e)
-            //         const bounceAnimation = new TWEEN.Tween(ball.position)
-            //             .to({ x: e.x, y: bounceHeight, z: e.z }, throwDuration / 2)
-            //             .easing(TWEEN.Easing.Bounce.Out)
-            //             .onComplete(() => {
-            //                 console.log('bounce')
-            //             })
-            //         bounceAnimation.start()
-            //     })
-            // You can also apply the throw to the corresponding Cannon.js body
-            const ballIndex = balls.indexOf(ball)
-
-            if (ballIndex >= 0) {
-                const ballBody = ballBodies[ballIndex]
-                ballBody.mass = 1
-
-                const force = new CANNON.Vec3(randomX, 10, randomZ) // Adjust the force as needed
-                ballBody.applyForce(force, new CANNON.Vec3(0, 0, 0)) // Apply the force to the body
-            }
+            new TWEEN.Tween(initialPosition)
+                .to(targetPosition, throwDuration)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .onUpdate(() => {
+                    ball.position.set(initialPosition.x, initialPosition.y, initialPosition.z)
+                })
+                .start()
+                .onComplete((e) => {
+                    // Animation complete, you can add further actions here
+                    console.log('ball thrown', e)
+                    const bounceAnimation = new TWEEN.Tween(ball.position)
+                        .to({ x: e.x, y: bounceHeight, z: e.z }, throwDuration / 2)
+                        .easing(TWEEN.Easing.Bounce.Out)
+                        .onComplete(() => {
+                            console.log('bounce')
+                        })
+                    bounceAnimation.start()
+                })
         }
 
+        // Set an interval to throw balls periodically
+
+        setInterval(() => {
+            const randomBallIndex = Math.floor(Math.random() * balls.length) // Select a random ball to throw
+            const randomBall = balls[randomBallIndex] as THREE.Mesh<
+                THREE.SphereGeometry,
+                THREE.MeshBasicMaterial
+            >
+            throwCricketBall(randomBall)
+        }, 5000)
+
         faceTrackerGroup.add(gltf.scene)
-        gloveLoaded = true
+        modelReady = true
     },
     undefined,
     () => {
         console.log('An error ocurred loading the GLTF model')
     }
 )
+
+//animation on catching the ball
+
+const firecrackerCanvas: any = document.getElementById('firecrackerCanvas')
+const firecrackerContext = firecrackerCanvas.getContext('2d')
+
+function playFirecrackerAnimation(x: any, y: any) {
+    // Clear the canvas
+    firecrackerContext.clearRect(0, 0, firecrackerCanvas.width, firecrackerCanvas.height)
+
+    // Implement your custom firecracker animation
+    // For example, draw some shapes, use colors, and animations
+
+    // In this example, we'll draw a simple explosion
+    const colors = ['#FF5733', '#FFC300', '#0E76A8', '#1A1A1D']
+    for (let i = 0; i < 100; i++) {
+        const color = colors[Math.floor(Math.random() * colors.length)]
+        firecrackerContext.fillStyle = color
+        firecrackerContext.beginPath()
+        firecrackerContext.arc(x, y, Math.random() * 10, 0, Math.PI * 2)
+        firecrackerContext.fill()
+    }
+
+    // You can add more complex animations here
+}
 
 // And then a little ambient light to brighten the model up a bit
 const ambientLight = new THREE.AmbientLight('white', 0.4)
@@ -350,7 +300,6 @@ function onDocumentClick(event: MouseEvent) {
 
 const clock = new THREE.Clock()
 let delta
-const cannonDebugRenderer = new CannonDebugRenderer(scene, world)
 
 window.addEventListener('resize', onWindowResize, false)
 console.log('scene', scene)
@@ -368,30 +317,12 @@ function animate() {
             child.rotation.y += 0.01
         }
     })
-
     delta = Math.min(clock.getDelta(), 0.1)
-    world.step(delta)
-
-    balls.forEach((ball, index) => {
-        const ballBody: any = ballBodies[index]
-        ball.position.copy(ballBody.position)
-        ball.quaternion.copy(ballBody.quaternion)
-    })
-
-    if (checkCollisions) checkCollisions() // Check for collisions
-    if (updateBoundingBoxes) updateBoundingBoxes() // Update bounding boxes' positions
-
-    if (gloveLoaded) {
-        gloveMesh.position.set(gloveBody.position.x, gloveBody.position.y, gloveBody.position.z)
-        gloveMesh.quaternion.set(
-            gloveBody.quaternion.x,
-            gloveBody.quaternion.y,
-            gloveBody.quaternion.z,
-            gloveBody.quaternion.w
-        )
+    if (modelReady) {
+        checkCollisions() // Check for collisions
+        updateBoundingBoxes() // Update bounding boxes' positions
     }
-
-    cannonDebugRenderer.update()
+    //cannonDebugRenderer.update()
     camera.updateFrame(renderer)
     mask.updateFromFaceAnchorGroup(faceTrackerGroup)
     TWEEN.update()
