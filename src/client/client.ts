@@ -117,7 +117,27 @@ for (let i = 0; i < 6; i++) {
 
 console.log(balls)
 
+// Create a Cannon.js sphere shape for the balls
+const ballShape = new CANNON.Sphere(0.1) // Adjust the radius as needed
+
+// Create a Cannon.js body for each ball
+const ballBodies = balls.map((ball) => {
+    const body = new CANNON.Body({ mass: 0 })
+    body.addShape(ballShape)
+    body.position.set(ball.position.x, ball.position.y, ball.position.z)
+    world.addBody(body)
+    return body
+})
+
 // creating bounding boxes to check for collison
+
+// Create a Cannon.js plane to stop the balls from falling
+const groundShape = new CANNON.Plane()
+const groundBody = new CANNON.Body({ mass: 0 })
+groundBody.addShape(groundShape)
+groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2) // Rotate the plane to be horizontal
+groundBody.position.set(0, -1, 0) // Set the plane at the screen's end
+world.addBody(groundBody)
 
 // Create bounding boxes for the GLB model and balls
 let gloveMesh: THREE.Object3D
@@ -132,23 +152,24 @@ gltfLoader.load(
         gltf.scene.rotation.set(Math.PI / 2, 0, 0)
         console.log('model_here', gltf.scene)
         gltf.scene.name = 'glove'
-        gloveMesh = gltf.scene.children[0]
+
         // Add the scene to the tracker group
         gltf.scene.traverse(function (child) {
             if ((child as THREE.Mesh).isMesh) {
                 let m = child as THREE.Mesh
+                gloveMesh = m
                 // Create a Cannon.js shape from the glove geometry
-                const gloveShape = CannonUtils.CreateTrimesh((m as THREE.Mesh).geometry)
-
+                const gloveShape = CannonUtils.CreateTrimesh((gloveMesh as THREE.Mesh).geometry)
+                console.log('gloveMesh', gloveMesh)
                 gloveBody = new CANNON.Body({ mass: 0 })
                 gloveBody.addShape(gloveShape)
 
                 gloveBody.position.set(
-                    gltf.scene.position.x,
-                    gltf.scene.position.y,
-                    gltf.scene.position.z
+                    gloveMesh.position.x,
+                    gloveMesh.position.y,
+                    gloveMesh.position.z
                 )
-                gloveBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2)
+                //gloveBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2)
 
                 // Add the glove body to the Cannon.js world
                 world.addBody(gloveBody)
@@ -222,9 +243,13 @@ gltfLoader.load(
                     // Collision detected between glove and the ball at index
                     // Implement collision response, e.g., bounce the ball
                     // Update the score
-                    score++
-                    scoreElement.innerText = 'Score: ' + score
-                    console.log('collision detected', index)
+                    if (ballBodies[index].mass === 1) {
+                        // Check if the ball has a mass of 1 (meaning it has been thrown)
+                        score++
+                        scoreElement.innerText = 'Score: ' + score
+                        console.log('Collision detected with ball ' + index)
+                        ballBodies[index].mass = 0 // Reset the ball's mass to 0 so it won't fall again
+                    }
                 }
             })
         }
@@ -233,46 +258,59 @@ gltfLoader.load(
         throwCricketBall = function (
             ball: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>
         ) {
-            console.log('ball is thrown')
-            const initialPosition = {
-                x: ball.position.x,
-                y: ball.position.y,
-                z: ball.position.z,
-            } // Initial position
-            const screenHeight = window.innerHeight
+            // Change the ball's mass to 1 when it is thrown
+
+            // console.log('ball is thrown')
+            // const initialPosition = {
+            //     x: ball.position.x,
+            //     y: ball.position.y,
+            //     z: ball.position.z,
+            // } // Initial position
+            // const screenHeight = window.innerHeight
 
             const randomX = Math.random() * 0.5 - 0.25 // Random variation in x-axis
 
             const randomZ = Math.random() * 0.5 - 0.25 // Random variation in z-axis
 
-            const maxY = -screenHeight / 2 + ball.geometry.parameters.radius
-            const targetPosition = {
-                x: ball.position.x + randomX,
-                y: gltf.scene.position.y - 1,
-                z: ball.position.z + randomZ,
-            } // Target position
-            const throwDuration = 2000 // Animation duration in milliseconds
-            const bounceHeight = 1
+            // const maxY = -screenHeight / 2 + ball.geometry.parameters.radius
+            // const targetPosition = {
+            //     x: ball.position.x + randomX,
+            //     y: gltf.scene.position.y - 1,
+            //     z: ball.position.z + randomZ,
+            // } // Target position
+            // const throwDuration = 2000 // Animation duration in milliseconds
+            // const bounceHeight = 1
 
-            new TWEEN.Tween(initialPosition)
-                .to(targetPosition, throwDuration)
-                .easing(TWEEN.Easing.Quadratic.Out)
-                .onUpdate(() => {
-                    ball.position.set(initialPosition.x, initialPosition.y, initialPosition.z)
-                })
-                .start()
-                .onComplete((e) => {
-                    // Animation complete, you can add further actions here
-                    console.log('ball thrown', e)
-                    const bounceAnimation = new TWEEN.Tween(ball.position)
-                        .to({ x: e.x, y: bounceHeight, z: e.z }, throwDuration / 2)
-                        .easing(TWEEN.Easing.Bounce.Out)
-                        .onComplete(() => {
-                            console.log('bounce')
-                        })
-                    bounceAnimation.start()
-                })
+            // new TWEEN.Tween(initialPosition)
+            //     .to(targetPosition, throwDuration)
+            //     .easing(TWEEN.Easing.Quadratic.Out)
+            //     .onUpdate(() => {
+            //         ball.position.set(initialPosition.x, initialPosition.y, initialPosition.z)
+            //     })
+            //     .start()
+            //     .onComplete((e) => {
+            //         // Animation complete, you can add further actions here
+            //         console.log('ball thrown', e)
+            //         const bounceAnimation = new TWEEN.Tween(ball.position)
+            //             .to({ x: e.x, y: bounceHeight, z: e.z }, throwDuration / 2)
+            //             .easing(TWEEN.Easing.Bounce.Out)
+            //             .onComplete(() => {
+            //                 console.log('bounce')
+            //             })
+            //         bounceAnimation.start()
+            //     })
+            // You can also apply the throw to the corresponding Cannon.js body
+            const ballIndex = balls.indexOf(ball)
+
+            if (ballIndex >= 0) {
+                const ballBody = ballBodies[ballIndex]
+                ballBody.mass = 1
+
+                const force = new CANNON.Vec3(randomX, 10, randomZ) // Adjust the force as needed
+                ballBody.applyForce(force, new CANNON.Vec3(0, 0, 0)) // Apply the force to the body
+            }
         }
+
         faceTrackerGroup.add(gltf.scene)
         gloveLoaded = true
     },
@@ -333,7 +371,12 @@ function animate() {
 
     delta = Math.min(clock.getDelta(), 0.1)
     world.step(delta)
-    cannonDebugRenderer.update()
+
+    balls.forEach((ball, index) => {
+        const ballBody: any = ballBodies[index]
+        ball.position.copy(ballBody.position)
+        ball.quaternion.copy(ballBody.quaternion)
+    })
 
     if (checkCollisions) checkCollisions() // Check for collisions
     if (updateBoundingBoxes) updateBoundingBoxes() // Update bounding boxes' positions
@@ -347,6 +390,8 @@ function animate() {
             gloveBody.quaternion.w
         )
     }
+
+    cannonDebugRenderer.update()
     camera.updateFrame(renderer)
     mask.updateFromFaceAnchorGroup(faceTrackerGroup)
     TWEEN.update()
