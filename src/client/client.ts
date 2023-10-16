@@ -26,6 +26,7 @@ document.body.appendChild(renderer.domElement)
 const manager = new ZapparThree.LoadingManager()
 // Use this function to set your context
 let camera = new ZapparThree.Camera({
+    rearCameraSource: 'csO9c0YpAf274OuCPUA53CNE0YHlIr2yXCi+SqfBZZ8=',
     userCameraSource: 'RKxXByjnabbADGQNNZqLVLdmXlS0YkETYCIbg+XxnvM=',
 })
 camera.userCameraMirrorMode = ZapparThree.CameraMirrorMode.CSS
